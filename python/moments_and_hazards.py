@@ -1,5 +1,5 @@
 """
-Numerical evaluation of moments, survival functions, and hazard rates
+Numerical evaluation of moments, survival functions, and hazard rates 
 for the Odd Lindley Generalized Beta Prime (OL-GBP) distribution.
 """
 
