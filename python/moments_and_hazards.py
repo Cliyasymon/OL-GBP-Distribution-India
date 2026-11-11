@@ -1,15 +1,13 @@
 """
-Analytical properties and numerical integration for Odd Lindley-G Beta Prime (OL-GBP)
-Computes theoretical PDF, CDF, survival rate, hazard rate, and numerical moments.
+Numerical evaluation of moments, survival functions, and hazard rates
+for the Odd Lindley Generalized Beta Prime (OL-GBP) distribution.
 """
 
 import numpy as np
-import matplotlib.pyplot as plt
 from scipy.special import beta as B_func, betainc
 from scipy.integrate import quad
 
 def olgbp_pdf(x, a, alpha, beta):
-    """Probability density function of OL-GBP distribution."""
     if x <= 0:
         return 0.0
     z = x / (1.0 + x)
@@ -20,7 +18,6 @@ def olgbp_pdf(x, a, alpha, beta):
     return (a**2 / (1.0 + a)) * (g / (diff**3)) * np.exp(-a * (G / diff))
 
 def olgbp_cdf(x, a, alpha, beta):
-    """Cumulative distribution function of OL-GBP distribution."""
     if x <= 0:
         return 0.0
     z = x / (1.0 + x)
@@ -30,18 +27,15 @@ def olgbp_cdf(x, a, alpha, beta):
     return np.clip(1.0 - term * np.exp(-a * (G / diff)), 0.0, 1.0)
 
 def olgbp_survival(x, a, alpha, beta):
-    """Survival function S(x) = 1 - F(x)."""
     return 1.0 - olgbp_cdf(x, a, alpha, beta)
 
 def olgbp_hazard(x, a, alpha, beta):
-    """Hazard rate function h(x) = f(x) / S(x)."""
     S_val = olgbp_survival(x, a, alpha, beta)
     if S_val <= 1e-15:
         return 0.0
     return olgbp_pdf(x, a, alpha, beta) / S_val
 
 def compute_moments(a, alpha, beta):
-    """Computes Mean, Variance, Skewness, and Kurtosis numerically."""
     mean, _ = quad(lambda x: x * olgbp_pdf(x, a, alpha, beta), 0, np.inf)
     m2, _ = quad(lambda x: (x**2) * olgbp_pdf(x, a, alpha, beta), 0, np.inf)
     m3, _ = quad(lambda x: (x**3) * olgbp_pdf(x, a, alpha, beta), 0, np.inf)
@@ -60,8 +54,8 @@ def compute_moments(a, alpha, beta):
     }
 
 if __name__ == "__main__":
-    test_params = {"a": 0.5, "alpha": 2.0, "beta": 3.0}
-    stats = compute_moments(**test_params)
-    print("Numerical Properties for OL-GBP (a=0.5, alpha=2.0, beta=3.0):")
+    params = {"a": 0.5, "alpha": 2.0, "beta": 3.0}
+    stats = compute_moments(**params)
+    print("Computed Numerical Properties:")
     for k, v in stats.items():
         print(f"  {k}: {v:.6f}")
