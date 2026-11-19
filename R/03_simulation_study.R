@@ -1,6 +1,7 @@
 # ==============================================================================
 # File: R/03_simulation_study.R
-# Purpose: Monte Carlo simulation to evaluate MLE consistency (Tables 1, 2, 3)
+# Purpose: Monte Carlo simulation to evaluate MLEs (MLE, MSE, RMSE,
+#          Absolute Bias, and Variance) for OL-GBP parameters
 # ==============================================================================
 
 if (!require("AdequacyModel")) install.packages("AdequacyModel")
@@ -10,74 +11,64 @@ library(GoFKernel)
 
 source("R/01_models_definition.R")
 
-run_mc_simulation <- function(true_par, sample_sizes = c(10, 30, 50, 70), n_rep = 1000, seed = 42) {
-  set.seed(seed) # Global seed outside the replication loop
-  
-  a_true <- true_par[1]
-  alpha_true <- true_par[2]
-  beta_true <- true_par[3]
-  
-  # Numerical quantile function using GoFKernel inverse
-  target_cdf <- function(x) cdf_olgbp(true_par, x)
-  Q_numeric <- inverse(target_cdf, lower = 1e-5, upper = 500)
-  
-  all_results <- list()
-  
-  for (n in sample_sizes) {
-    cat(sprintf("Running Monte Carlo: n = %d, reps = %d, par = (%.2f, %.2f, %.2f)...\n", 
-                n, n_rep, a_true, alpha_true, beta_true))
-    
-    estimates <- matrix(NA, nrow = n_rep, ncol = 3)
-    colnames(estimates) <- c("a", "alpha", "beta")
-    
-    for (i in 1:n_rep) {
+simulate_olgbp <- function(true_par, n_vals = c(10, 30, 50, 70), n_rep = 1000, seed = 1000) {
+  set.seed(seed) # Set once outside replication loops for distinct Monte Carlo draws
+
+  q_fn <- inverse(function(x) cdf_olgbp(true_par, x), lower = 1e-5, upper = 500)
+  out_list <- list()
+
+  for (n in n_vals) {
+    est_mat <- matrix(NA_real_, nrow = n_rep, ncol = 3)
+    colnames(est_mat) <- c("a", "alpha", "beta")
+
+    for (r in seq_len(n_rep)) {
       u <- runif(n)
-      x_sim <- sapply(u, Q_numeric)
-      
-      fit_res <- tryCatch({
+      x_sim <- sapply(u, q_fn)
+
+      fit <- tryCatch(
         goodness.fit(
           pdf = pdf_olgbp, cdf = cdf_olgbp,
           starts = true_par, data = x_sim,
           method = "PSO", domain = c(0, Inf),
           lim_inf = c(1e-4, 1e-4, 1e-4), lim_sup = c(10, 10, 10),
           N = 30
-        )$mle
-      }, error = function(e) rep(NA, 3))
-      
-      estimates[i, ] <- fit_res
+        )$mle,
+        error = function(e) rep(NA_real_, 3)
+      )
+      est_mat[r, ] <- fit
     }
-    
-    valid_estimates <- estimates[complete.cases(estimates), , drop = FALSE]
-    
-    mean_mle <- colMeans(valid_estimates)
+
+    valid <- est_mat[complete.cases(est_mat), , drop = FALSE]
+    mean_mle <- colMeans(valid)
     bias <- mean_mle - true_par
     abs_bias <- abs(bias)
-    mse <- colMeans(sweep(valid_estimates, 2, true_par)^2)
+    mse <- colMeans(sweep(valid, 2, true_par)^2)
     rmse <- sqrt(mse)
-    variance <- apply(valid_estimates, 2, var)
-    
-    res_df <- data.frame(
-      SampleSize = n,
+    variance <- apply(valid, 2, var)
+
+    out_list[[as.character(n)]] <- data.frame(
+      Sample_Size = n,
       Parameter = c("a", "alpha", "beta"),
-      True = true_par,
-      MLE = mean_mle,
-      MSE = mse,
-      RMSE = rmse,
-      Absolute_Bias = abs_bias,
-      Variance = variance
+      True = as.numeric(true_par),
+      MLE = round(mean_mle, 6),
+      MSE = round(mse, 6),
+      RMSE = round(rmse, 6),
+      Absolute_Bias = round(abs_bias, 6),
+      Variance = round(variance, 6),
+      stringsAsFactors = FALSE
     )
-    all_results[[as.character(n)]] <- res_df
   }
-  
-  final_table <- do.call(rbind, all_results)
-  print(round(final_table[, 3:8], 6))
-  return(final_table)
+
+  do.call(rbind, out_list)
 }
 
-# Example run replicating Table 1 (Set 1: a=0.5, alpha=0.4, beta=0.4)
-cat("\nReplicating Simulation: Parameter Set 1 (Table 1)\n")
-sim_table1 <- run_mc_simulation(
-  true_par = c(a = 0.5, alpha = 0.4, beta = 0.4),
-  sample_sizes = c(10, 30, 50, 70),
-  n_rep = 100 # Set to 1000 for full replication
+# Example parameter sets from the manuscript simulation tables
+param_sets <- list(
+  set_1 = c(a = 0.5, alpha = 0.40, beta = 0.40),
+  set_2 = c(a = 0.9, alpha = 0.40, beta = 0.55),
+  set_3 = c(a = 0.6, alpha = 0.65, beta = 0.75)
 )
+
+# Use n_rep = 1000 for full paper study (reduce to e.g. 50 for a fast local check)
+res_set1 <- simulate_olgbp(param_sets$set_1, n_vals = c(10, 30, 50, 70), n_rep = 1000)
+print(res_set1, row.names = FALSE)
